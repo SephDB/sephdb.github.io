@@ -1,8 +1,3 @@
----
-layout: post
-title:  "Solving VM Allocation Using Linear Programming Solvers"
----
-
 Situation sketch: you have the task of taking in an arbitrary set of virtual machines to place on your fixed set of servers. You start by writing a simple greedy approach that divides them about evenly to not stress any one server too much. Then comes the idea of wanting to use as few servers as possible to get some power savings, so you adapt it. But now that ends up using all available resources on each server before going on to fill the next, which wreaks havoc on performance because now most CPUs are being used hyperthreaded. So you rethink again to only aggressively fill until physical core count and only start using hyperthreading when all servers are in use this way. More soft constraints keep popping up, and most end up requiring a rethinking of the strategy. These range from “we’d like to avoid oversubscribing cores” to “try to keep these pairs of VMs on the same machine”, and it quickly becomes a pain to balance these in a hand-written algorithm.
 
 Enter linear programming solvers. They allow you to encode your problem into a mathematical model of constraints and an objective function to be optimized, and spit out an optimal solution (which, in most cases along the previous paragraph, they do incredibly fast or tell you that the constraints can’t be met). This post will be an introduction to techniques for encoding a resource allocation issue into a linear programming model, and show a glimpse of how powerful and flexible they can be.
@@ -15,12 +10,10 @@ A linear equation is one where each term is a variable multiplied by a constant,
 
 In LP these equations are used to constrain what values are valid for which variables. Constraints can also consist of inequalities, as in the following example:
 
-<center>
-
-    x + y <= 10
-    2*x + y >= 14
-
-</center>
+<center><verbatim>
+x + y <= 10<br>
+2*x + y >= 14<br>
+</verbatim></center>
 
 Possible solutions include x=5,y=4; x=6,y=4;...
 
@@ -38,25 +31,23 @@ The first step in this mapping is to figure out what the results you extract wil
 
 Since a VM has to be put on exactly one server to have a valid solution, we create the following constraint for each VM:
 
-<center>
-
-    For each VM:
-    vm_on_server[vm][servers[0]] + vm_on_server[vm][servers[1]] + … = 1
-
-</center>
+<center><verbatim>
+For each VM:<br>
+vm_on_server[vm][servers[0]] + vm_on_server[vm][servers[1]] + … = 1
+</verbatim></center>
 
 Since each of these variables can only be 0 or 1, exactly one of them has to be 1 to satisfy the constraint.
 
 Now on to the second and only other hard constraint in the system we’re working on: resource usage constraints. A maximum on resource usage for each server. For this, we multiply each vm_on_server variable by the amount of resources(eg: CPU cores) the VM uses.
 
-<center>
+  
 
-    For each server:
-    cpu(vms[0])*vm_on_server[vms[0]][server] + cpu(vms[1])*vm_on_server[vms[1]][server] + …
-    <=
-    max_cpu(server)
-
-</center>
+<center><verbatim>
+For each server:<br>
+cpu(vms[0])*vm_on_server[vms[0]][server] + cpu(vms[1])*vm_on_server[vms[1]][server] + … <br>
+<=<br>
+max_cpu(server)
+</verbatim></center>
 
 ### Objective function
 
@@ -65,22 +56,18 @@ These get encoded in the objective functions as variables with their own weight.
 
 To give each server used a cost, we can add a variable for each server that says whether it is used or not (again, a boolean variable that is either 0 or 1), along with a (positive) weight w_1, which then gets added into the objective function:
 
-<center>
-
-    w_1*server_used[servers[0]] + w_1*server_used[servers[1]] + …
-
-</center>
+<center><verbatim>
+w_1*server_used[servers[0]] + w_1*server_used[servers[1]] + …
+</verbatim></center>
 
 As it stands, the solver will simply set all of them to 0 because there are no constraints saying they need to be set to 1 if there is a VM on a server. To do that, we can change right-hand side of the resource usage constraint to say the following:
 
-<center>
-
-    For each server:
-    cpu(vms[0])*vm_on_server[vms[0]][server] + cpu(vms[1])*vm_on_server[vms[1]][server] + …
-    <=
-    max_cpu(server)*server_used[server]
-
-</center>
+<center><verbatim>
+For each server:<br>
+cpu(vms[0])*vm_on_server[vms[0]][server] + cpu(vms[1])*vm_on_server[vms[1]][server] + … <br>
+<=<br>
+max_cpu(server)<b>*server_used[server]</b>
+</verbatim></center>
 
 If server_used[server] is 0, there can be no VMs on that server(because no VM uses fewer than 0 CPU cores), but when it is 1 the constraint works the same way it did before. Because the solver tries to minimize the objective function, and all server_used variables are associated with a positive weight in it, the solver will set all the ones it can to 0.
 
@@ -90,20 +77,16 @@ Making the LP solver avoid using hyperthreaded cores if possible means associati
 
 To get constraints that have an upper(or lower) limit that the solver is allowed to cross with an associated cost for each unit it crosses it by, we take the hard constraint that we want to soften, add in a variable to represent the amount the constraint is “violated” by, and use that variable as a cost in the objective function. Eg:
 
-<center>
-
-    x + y <= 10
-
-</center>
+<center><verbatim>
+x + y <= 10
+</verbatim></center>
 
 Gets transformed into
 
-<center>
-
-    x + y - excess <= 10
-    excess >= 0
-
-</center>
+<center><verbatim>
+x + y - excess <= 10<br>
+excess >= 0
+</verbatim></center>
 
 And excess is added to the objective function with a weight specifying how badly the LP solver needs to avoid violating the constraint.
 
@@ -111,36 +94,30 @@ And excess is added to the objective function with a weight specifying how badly
 
 In the case of a >= constraint, the excess is added to the constraint instead of subtracted, with the same addition to the objective function to penalize violating the constraint.
 
-<center>
-
-    x + y >= 10
-    x + y + excess >= 10
-    excess >= 0
-
-</center>
+<center><verbatim>
+x + y >= 10<br>
+x + y + excess >= 10<br>
+excess >= 0
+</verbatim></center>
 
 For an equality constraint, violation can go in either direction, and thus two excess variables are needed to make the penalty always positive:
 
-<center>
-
-    x + y = 10
-    x + y + excess_neg - excess_pos = 10
-    excess_neg >= 0
-    excess_pos >= 0
-
-</center>
+<center><verbatim>
+x + y = 10<br>
+x + y + excess_neg - excess_pos = 10<br>
+excess_neg >= 0<br>
+excess_pos >= 0
+</verbatim></center>
 
 But what if you want your constraint to have some give before penalisation? If, for example, you only want to penalize when x + y goes under five, or over 12? You could split it up into two constraints(same can be done for the above equality constraint), but a faster way is adding one extra variable that doesn’t appear in the objective function that is allowed to be in the range [-2,5]:
 
-<center>
-
-    x + y = 10
-    x + y + excess_neg - excess_pos + slack = 10
-    excess_neg >= 0
-    excess_pos >= 0
-    -2 <= slack <= 5
-
-</center>
+<center><verbatim>
+x + y = 10<br>
+x + y + excess_neg - excess_pos + slack = 10<br>
+excess_neg >= 0<br>
+excess_pos >= 0<br>
+-2 <= slack <= 5
+</verbatim></center>
 
 If x + y is 5, slack will be set to 5 causing no additional cost to the objective function. If it is 4, slack will be set to 5 and excess_neg to 1, etc.
 
@@ -148,33 +125,28 @@ If x + y is 5, slack will be set to 5 causing no additional cost to the objectiv
 
 Now we know how elastic constraints work, it’s a lot more clear how to insert a cost for each hyperthreaded core used. We can put an elastic constraint on numbers of cores used per server with an upper limit of the physical core count:
 
-<center>
-
-    For each server:
-    cpu(vms[0])*vm_on_server[vms[0]][server] + … - excess <= physical_cores(server)
-    excess >= 0
-
-</center>
+<center><verbatim>
+For each server:<br>
+cpu(vms[0])*vm_on_server[vms[0]][server] + … - excess <= physical_cores(server)<br>
+excess >= 0
+</verbatim></center>
 
 And we can put excess into the objective function as a cost. This will cause the solver to spread out the VMs in order to not use hyperthreaded cores if it can help it (but, in combination with the cost per server in use, will try to pack them).
 
 This makes all hyperthreaded cores have the same cost, so the solver won’t care whether it fills up one server completely and uses only physical cores on another, or spreading them out more evenly. To make the solver spread hyperthreaded use more evenly, we can introduce extra costs for extra cores used:
 
-<center>
-
-    For each server:<br>
-    cpu(vms[0])*vm_on_server[vms[0]][server] + … - excess <= physical_cores(server)+1
-    excess >= 0
-    
-    For each server:
-    cpu(vms[0])*vm_on_server[vms[0]][server] + … - excess <= physical_cores(server)+2
-    excess >= 0
-    …
-    For each server:
-    cpu(vms[0])*vm_on_server[vms[0]][server] + … - excess <= physical_cores(server)*2-1
-    excess >= 0
-
-</center>
+<center><verbatim>
+For each server:<br>
+cpu(vms[0])*vm_on_server[vms[0]][server] + … - excess <= physical_cores(server)<b>+1</b><br>
+excess >= 0<br><br>
+For each server:<br>
+cpu(vms[0])*vm_on_server[vms[0]][server] + … - excess <= physical_cores(server)<b>+2</b><br>
+excess >= 0<br>
+…<br>
+For each server:<br>
+cpu(vms[0])*vm_on_server[vms[0]][server] + … - excess <= physical_cores(server)<b>*2-1</b><br>
+excess >= 0
+</verbatim></center>
 
 Given that this might introduce a lot of extra constraints and variables, it is useful to limit this by having only a couple of these extra constraints at every N hyperthreaded cores used(with N being for example physical_cores(server)/4) instead of for every single one. Note that the weights associated with each of the excess variables will keep counting up, so giving each of them a weight of 1 will, when e.g. 4 cores are hyperthreaded, result in a cost of 10.
 
@@ -184,34 +156,28 @@ Another interesting use of elastic constraints is to try and keep VMs colocated 
 
 If you want to force them to be together, you can do so in a single hard constraint:
 
-<center>
-
-    1*vm_on_server[vm1][servers[0]] + 2*vm_on_server[vm1][servers[1]] +...
-    =
-    1*vm_on_server[vm2][servers[0]] + 2*vm_on_server[vm2][servers[1]] +...
-
-</center>
+<center><verbatim>
+1*vm_on_server[vm1][servers[0]] + 2*vm_on_server[vm1][servers[1]] +...<br/>
+=<br/>
+1*vm_on_server[vm2][servers[0]] + 2*vm_on_server[vm2][servers[1]] +...
+</verbatim></center>
 
 Making this constraint elastic introduces an unintended side effect that if the solver has to pull them apart, it will still try to put them on servers close in number to each other. This happens because when vm1 gets put on server 3 and vm2 on server 5, the difference will be 2(and thus the penalty will be 2 times whatever weight you assigned to the excess variables), while if vm2 would be put on server 4 the excess would only be 1.
 To get rid of this side effect, we need a different set of constraints:
 
-<center>
-
-    For each server:
-    vm_on_server[vm1][server] - vm_on_server[vm2][server] = 0
-
-</center>
+<center><verbatim>
+For each server: <br>
+vm_on_server[vm1][server] - vm_on_server[vm2][server] = 0
+</verbatim></center>
 
 Making these elastic makes the solver try to keep them together without caring about how far apart they are if they’re split up, since the only thing that influences the constraints is whether or not they’re on the same server):
 
-<center>
-
-    For each server:
-    vm_on_server[vm1][server] - vm_on_server[vm2][server] + excess_neg - excess_pos = 0
-    excess_neg >= 0
-    excess_pos >= 0
-
-</center>
+<center><verbatim>
+For each server:<br>
+vm_on_server[vm1][server] - vm_on_server[vm2][server] + excess_neg - excess_pos = 0
+excess_neg >= 0<br>
+excess_pos >= 0
+</verbatim></center>
 
 The excess variables in this case will be either 0 or 1. Note that when there’s a penalty, one excess_pos and one excess_neg variable(the ones for vm1’s server and vm2’s server, respectively) will be 1, so the weight for these will be counted twice, or we can treat one of them as a slack variable instead of an excess variable and not include it in the objective function.
 
