@@ -3,9 +3,12 @@ layout: post
 title:  "Solving VM Allocation Using Linear Programming Solvers"
 ---
 
-Situation sketch: you have the task of taking in an arbitrary set of virtual machines to place on your fixed set of servers. You start by writing a simple greedy approach that divides them about evenly to not stress any one server too much. Then comes the idea of wanting to use as few servers as possible to get some power savings, so you adapt it. But now that ends up using all available resources on each server before going on to fill the next, which wreaks havoc on performance because now most CPUs are being used hyperthreaded. So you rethink again to only aggressively fill until physical core count and only start using hyperthreading when all servers are in use this way. More soft constraints keep popping up, and most end up requiring a rethinking of the strategy. These range from “we’d like to avoid oversubscribing cores” to “try to keep these pairs of VMs on the same machine”, and it quickly becomes a pain to balance these in a hand-written algorithm.
+Situation sketch: you have the task of taking in an arbitrary set of virtual machines to place on your fixed set[^1] of servers. You start by writing a simple greedy approach that divides them about evenly to not stress any one server too much. Then comes the idea of wanting to use as few servers as possible to get some power savings, so you adapt it. But now that ends up using all available resources on each server before going on to fill the next, which wreaks havoc on performance because now most CPUs are being used hyperthreaded. So you rethink again to only aggressively fill until physical core count and only start using hyperthreading when all servers are in use this way. More soft constraints keep popping up, and most end up requiring a rethinking of the strategy. These range from “we’d like to avoid oversubscribing cores” to “try to keep these pairs of VMs on the same machine”, and it quickly becomes a pain to balance these in a hand-written algorithm.
 
 Enter linear programming solvers. They allow you to encode your problem into a mathematical model of constraints and an objective function to be optimized, and spit out an optimal solution (which, in most cases along the previous paragraph, they do incredibly fast or tell you that the constraints can’t be met). This post will be an introduction to techniques for encoding a resource allocation issue into a linear programming model, and show a glimpse of how powerful and flexible they can be.
+
+[^1]:Generalizing to a flexible number of servers is possible, see the end of this post
+
 
 ## Linear programming?
 
