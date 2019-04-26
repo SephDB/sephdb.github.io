@@ -11,8 +11,8 @@ A linear equation is one where each term is a variable multiplied by a constant,
 In LP these equations are used to constrain what values are valid for which variables. Constraints can also consist of inequalities, as in the following example:
 
 <center><verbatim>
-x + y <= 10<br>
-2*x + y >= 14<br>
+x + y <= 10<br/>
+2*x + y >= 14<br/>
 </verbatim></center>
 
 Possible solutions include x=5,y=4; x=6,y=4;...
@@ -35,6 +35,7 @@ Since a VM has to be put on exactly one server to have a valid solution, we crea
 For each VM:<br>
 vm_on_server[vm][servers[0]] + vm_on_server[vm][servers[1]] + … = 1
 </verbatim></center>
+ 
 
 Since each of these variables can only be 0 or 1, exactly one of them has to be 1 to satisfy the constraint.
 
@@ -60,6 +61,7 @@ To give each server used a cost, we can add a variable for each server that says
 w_1*server_used[servers[0]] + w_1*server_used[servers[1]] + …
 </verbatim></center>
 
+
 As it stands, the solver will simply set all of them to 0 because there are no constraints saying they need to be set to 1 if there is a VM on a server. To do that, we can change right-hand side of the resource usage constraint to say the following:
 
 <center><verbatim>
@@ -68,6 +70,7 @@ cpu(vms[0])*vm_on_server[vms[0]][server] + cpu(vms[1])*vm_on_server[vms[1]][serv
 <=<br>
 max_cpu(server)<b>*server_used[server]</b>
 </verbatim></center>
+
 
 If server_used[server] is 0, there can be no VMs on that server(because no VM uses fewer than 0 CPU cores), but when it is 1 the constraint works the same way it did before. Because the solver tries to minimize the objective function, and all server_used variables are associated with a positive weight in it, the solver will set all the ones it can to 0.
 
@@ -81,6 +84,7 @@ To get constraints that have an upper(or lower) limit that the solver is allowed
 x + y <= 10
 </verbatim></center>
 
+
 Gets transformed into
 
 <center><verbatim>
@@ -88,9 +92,8 @@ x + y - excess <= 10<br>
 excess >= 0
 </verbatim></center>
 
-And excess is added to the objective function with a weight specifying how badly the LP solver needs to avoid violating the constraint.
 
-  
+And excess is added to the objective function with a weight specifying how badly the LP solver needs to avoid violating the constraint.
 
 In the case of a >= constraint, the excess is added to the constraint instead of subtracted, with the same addition to the objective function to penalize violating the constraint.
 
@@ -100,14 +103,16 @@ x + y + excess >= 10<br>
 excess >= 0
 </verbatim></center>
 
+
 For an equality constraint, violation can go in either direction, and thus two excess variables are needed to make the penalty always positive:
 
 <center><verbatim>
 x + y = 10<br>
 x + y + excess_neg - excess_pos = 10<br>
 excess_neg >= 0<br>
-excess_pos >= 0
+excess_pos >= 0<br>
 </verbatim></center>
+
 
 But what if you want your constraint to have some give before penalisation? If, for example, you only want to penalize when x + y goes under five, or over 12? You could split it up into two constraints(same can be done for the above equality constraint), but a faster way is adding one extra variable that doesn’t appear in the objective function that is allowed to be in the range [-2,5]:
 
@@ -116,8 +121,9 @@ x + y = 10<br>
 x + y + excess_neg - excess_pos + slack = 10<br>
 excess_neg >= 0<br>
 excess_pos >= 0<br>
--2 <= slack <= 5
+-2 <= slack <= 5<br>
 </verbatim></center>
+
 
 If x + y is 5, slack will be set to 5 causing no additional cost to the objective function. If it is 4, slack will be set to 5 and excess_neg to 1, etc.
 
@@ -128,7 +134,7 @@ Now we know how elastic constraints work, it’s a lot more clear how to insert 
 <center><verbatim>
 For each server:<br>
 cpu(vms[0])*vm_on_server[vms[0]][server] + … - excess <= physical_cores(server)<br>
-excess >= 0
+excess >= 0<br>
 </verbatim></center>
 
 And we can put excess into the objective function as a cost. This will cause the solver to spread out the VMs in order to not use hyperthreaded cores if it can help it (but, in combination with the cost per server in use, will try to pack them).
