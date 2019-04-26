@@ -14,7 +14,7 @@ Enter linear programming solvers. They allow you to encode your problem into a m
 
 Linear Programming (LP for short) is built on the simplest equations that exist: linear equations.
 
-A linear equation is one where each term is a variable multiplied by a constant, like 10*x = 20 (where the solution is that x is 2). In contrast, non-linear equations are ones where terms get more complex, like x*y (with x and y both being variables), log(x), etc. Limiting the equations to linear ones makes for a lot of interesting optimizations in the solver (which this post will not dive into, as we’re concerned with how to use them instead of building them ourselves).
+A linear equation is one where each term is a variable multiplied by a constant, like <verbatim>10*x = 20</verbatim> (where the solution is that x is 2). In contrast, non-linear equations are ones where terms get more complex, like <verbatim>x*y</verbatim> (with x and y both being variables), log(x), etc. Limiting the equations to linear ones makes for a lot of interesting optimizations in the solver (which this post will not dive into, as we’re concerned with how to use them instead of building them ourselves).
 
 In LP these equations are used to constrain what values are valid for which variables. Constraints can also consist of inequalities, as in the following example:
 
@@ -25,7 +25,7 @@ x + y <= 10<br/>
 
 Possible solutions include x=5,y=4; x=6,y=4;...
 
-Because a set of constraints like the above often has lots of solutions, not all of which are equally desirable, LP problems also have an objective function, which is a linear equation without a comparison operator. This function gives a value to every solution of the constraints, which LP solvers then try to minimize (or maximize).
+Because a set of constraints like the above often has lots of solutions, not all of which are equally desirable, LP problems also have an *objective function*, which is a linear equation without a comparison operator. This function gives a value to every solution of the constraints, which LP solvers then try to minimize (or maximize).
 
 Let’s say we want to minimize the value of x-y in the above example. Using that as our objective function gives us one unique solution: x=4,y=6.
 
